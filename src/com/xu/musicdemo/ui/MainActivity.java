@@ -3,7 +3,10 @@ package com.xu.musicdemo.ui;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
 
+import android.R.color;
 import android.R.integer;
 import android.app.ActionBar.LayoutParams;
 import android.app.Activity;
@@ -43,6 +46,9 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 	/** 答案状态-- 不完整 */
 	public final static int STATUS_ANSWER_LACK = 3;
 
+	// 闪烁次数
+	public final static int SPASH_TIMES = 6;
+
 	// 唱片相关动画(代码规范！！)
 	private Animation mPanAnim;
 	private LinearInterpolator mPanLin;
@@ -60,6 +66,9 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 	// play 按键事件
 	private ImageButton mBtnPlayStart;
 
+	// 过关界面
+	private View mPassView;
+	
 	// 判断是否在播放
 	private boolean mIsRunning = false;
 
@@ -270,18 +279,31 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 	@Override
 	public void onWordButtonClick(WordButton wordButton) {
 		setSelectWord(wordButton);
-		
+
 		// 获得答案状态
 		int checkResult = checkTheAnswer();
-		
+
 		// 检查答案
 		if (checkResult == STATUS_ANSWER_RIGHT) {
-			
+			// 过关并获得奖励
+			handlePassEvent();
 		} else if (checkResult == STATUS_ANSWER_WRONG) {
-			
+			// 闪烁文字并提示用户
+			sparkTheWords();
 		} else if (checkResult == STATUS_ANSWER_LACK) {
-			
+			// 设置文字颜色为白色
+			for (int i = 0; i < mBtnSelectWords.size(); i++) {
+				mBtnSelectWords.get(i).mViewButton.setTextColor(Color.WHITE);
+			}
 		}
+	}
+	
+	/**
+	 * 处理过关界面及事件
+	 */
+	private void handlePassEvent() {
+		mPassView = (LinearLayout)this.findViewById(R.id.pass_view);
+		mPassView.setVisibility(View.VISIBLE);
 	}
 
 	private void clearTheAnswer(WordButton wordButton) {
@@ -415,4 +437,41 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 		return (sb.toString().equals(mCurrentSong.getSongName())) ? STATUS_ANSWER_RIGHT
 				: STATUS_ANSWER_WRONG;
 	}
+
+	/**
+	 * 文字闪烁
+	 */
+	private void sparkTheWords() {
+		// 定时器相关
+		TimerTask task = new TimerTask() {
+			boolean mChange = false;
+			int mSparedTimes = 0;
+
+			@Override
+			public void run() {
+				runOnUiThread(new Runnable() {
+
+					@Override
+					public void run() {
+						if (++mSparedTimes > SPASH_TIMES) {
+							return;
+						}
+
+						// 执行闪烁逻辑：交替显示红色和白色的文字
+						for (int i = 0; i < mBtnSelectWords.size(); i++) {
+							mBtnSelectWords.get(i).mViewButton
+									.setTextColor(mChange ? Color.RED
+											: Color.WHITE);
+						}
+						mChange = !mChange;
+					}
+				});
+			}
+		};
+
+		Timer timer = new Timer();
+		timer.schedule(task, 1, 150);
+
+	}
+
 }
