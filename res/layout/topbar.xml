@@ -6,7 +6,7 @@
     android:orientation="vertical" >
 
     <FrameLayout
-        android:id="@+id/btn_bar_add_coin"
+        android:id="@+id/layout_bar_coin"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentRight="true"

@@ -365,6 +365,7 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 			public void onClick(View v) {
 				if (judgeAppPassed()) {
 					// 进入到通关界面
+					Util.startActivity(MainActivity.this, AllPassView.class);
 				} else {
 					// 开始新一关
 					mPassView.setVisibility(View.GONE);
