@@ -24,11 +24,13 @@ import android.widget.TextView;
 
 import com.xu.musicdemo.R;
 import com.xu.musicdemo.data.Const;
+import com.xu.musicdemo.model.IAlertDialogButtonListener;
 import com.xu.musicdemo.model.IWordButtonClickListener;
 import com.xu.musicdemo.model.Song;
 import com.xu.musicdemo.model.WordButton;
 import com.xu.musicdemo.myui.MyGridView;
 import com.xu.musicdemo.util.MyLog;
+import com.xu.musicdemo.util.MyPlayer;
 import com.xu.musicdemo.util.Util;
 
 public class MainActivity extends Activity implements IWordButtonClickListener {
@@ -46,6 +48,12 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 
 	// 闪烁次数
 	public final static int SPASH_TIMES = 6;
+
+	public static final int ID_DIALOG_DELETE_WORD = 1;
+
+	public static final int ID_DIALOG_TIP_ANSWER = 2;
+
+	public static final int ID_DIALOG_LACK_COINS = 3;
 
 	// 唱片相关动画(代码规范！！)
 	private Animation mPanAnim;
@@ -107,6 +115,11 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 		super.onCreate(savedInstanceState);
 		// requestWindowFeature(Window.FEATURE_NO_TITLE);
 		setContentView(R.layout.activity_main);
+		
+		// 读取数据
+		int[] datas = Util.loadData(MainActivity.this);
+		mCurrentStageIndex = datas[Const.INDEX_LOAD_DATA_STAGE];
+		mCurrentCoins = datas[Const.INDEX_LOAD_DATA_COINS];
 
 		mViewPan = (ImageView) findViewById(R.id.imageView);
 		mViewPanBar = (ImageView) findViewById(R.id.imageView3);
@@ -205,19 +218,32 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 		handleTipAnswer();
 	}
 
+	/**
+	 * 处理圆盘中间的播放按钮，就是开始播放音乐
+	 */
 	private void HandlePlayButton() {
 		if (mViewPanBar != null) {
 			if (!mIsRunning) {
 				mIsRunning = true;
 				mViewPanBar.startAnimation(mBarInAnim);
 				mBtnPlayStart.setVisibility(View.INVISIBLE);
+
+				// 播放音乐
+				MyPlayer.playSong(MainActivity.this,
+						mCurrentSong.getSongFileName());
 			}
 		}
 	}
 
 	@Override
 	protected void onPause() {
+		// 保存游戏数据
+		Util.saveData(MainActivity.this, mCurrentStageIndex - 1, mCurrentCoins);
+		
 		mViewPan.clearAnimation(); // 动画需要暂停
+		
+		// 暂停音乐
+		MyPlayer.stopTheSong(MainActivity.this);
 		super.onPause();
 	}
 
@@ -261,6 +287,9 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 		mAllWords = initAllWord();
 		// 更新MyGridView数据
 		mMyGridView.updateData(mAllWords);
+		
+		// 一开始播放音乐
+		HandlePlayButton();
 	}
 
 	/**
@@ -344,6 +373,12 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 
 		// 停止未完成的动画
 		mViewPan.clearAnimation();
+		
+		// 停止正在播放的音乐
+		MyPlayer.stopTheSong(MainActivity.this);
+		
+		// 播放音效
+		MyPlayer.playTone(MainActivity.this, MyPlayer.INDEX_STONE_COIN);
 
 		// 当前关的索引
 		mCurrentStagePassView = (TextView) findViewById(R.id.text_current_stage_pass);
@@ -569,6 +604,7 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 				// 减少金币
 				if (!handleCoins(-getTipCoins())) {
 					// 金币不够，显示提示对话框
+					showConfirmDialog(ID_DIALOG_LACK_COINS);
 					return;
 				}
 				break;
@@ -590,6 +626,7 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 		// 减少金币
 		if (!handleCoins(-getDeleteWordCoins())) {
 			// 金币不够，显示提示对话框
+			showConfirmDialog(ID_DIALOG_LACK_COINS);
 			return;
 		}
 
@@ -699,7 +736,8 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 
 			@Override
 			public void onClick(View v) {
-				deleteOneWord();
+				// deleteOneWord();
+				showConfirmDialog(ID_DIALOG_DELETE_WORD);
 			}
 		});
 	}
@@ -713,9 +751,63 @@ public class MainActivity extends Activity implements IWordButtonClickListener {
 
 			@Override
 			public void onClick(View v) {
-				tipAnswer();
+				// tipAnswer();
+				showConfirmDialog(ID_DIALOG_TIP_ANSWER);
 			}
 		});
 	}
 
+	// 自定义AlertDialog事件响应
+	// 删除错误答案
+	private IAlertDialogButtonListener mBtnOkDeleteWordListener = new IAlertDialogButtonListener() {
+
+		@Override
+		public void onClick() {
+			// 执行事件
+			deleteOneWord();
+		}
+	};
+
+	// 答案提示
+	private IAlertDialogButtonListener mBtnOkTipAnswerListener = new IAlertDialogButtonListener() {
+
+		@Override
+		public void onClick() {
+			// 执行事件
+			tipAnswer();
+		}
+	};
+
+	// 金币不足
+	private IAlertDialogButtonListener mBtnOkLackCoinsListener = new IAlertDialogButtonListener() {
+
+		@Override
+		public void onClick() {
+			// 执行事件
+		}
+	};
+
+	/**
+	 * 显示对话框
+	 * 
+	 * @param id
+	 */
+	private void showConfirmDialog(int id) {
+		switch (id) {
+		case ID_DIALOG_DELETE_WORD:
+			Util.showDialog(MainActivity.this, "确认花掉" + getDeleteWordCoins()
+					+ "个金币去掉一个错误答案", mBtnOkDeleteWordListener);
+			break;
+
+		case ID_DIALOG_TIP_ANSWER:
+			Util.showDialog(MainActivity.this, "确认花掉" + getTipCoins()
+					+ "个金币获得一个文字提示", mBtnOkTipAnswerListener);
+			break;
+
+		case ID_DIALOG_LACK_COINS:
+			Util.showDialog(MainActivity.this, "金币不足，去商店补充？",
+					mBtnOkLackCoinsListener);
+			break;
+		}
+	}
 }
